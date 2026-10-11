@@ -1,15 +1,17 @@
 # git-tree — a git tree for Claude Code
 
 A [Claude Code](https://claude.com/claude-code) mod that shows your git repository right in the
-interface: a commit graph in a pane beside the conversation and a status band above the prompt —
-styled like an old CRT terminal (green phosphor on black, bloom, scanlines).
+interface: a commit graph in a pane beside the conversation and a status band above the prompt.
 
 <p align="center">
-  <img src="docs/panel.png" alt="The git tree pane in a CRT terminal style: commit graph, an opened commit with [M] and [A] status marks, a diff, and the Explain with Claude button with a blinking cursor" width="740">
+  <img src="docs/panel.png" alt="The git tree pane: commit graph, an opened commit with coloured file status dots, a diff, and the Explain with Claude button" width="720">
 </p>
 
 <p align="center">
-  <img src="docs/pasek.png" alt="The band above the prompt in a terminal style: branch, commits to push, changes, worktrees with changes and PRs to review" width="820">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/pasek-ciemny.png">
+    <img src="docs/pasek-jasny.png" alt="The band above the prompt: branch, commits to push, changes, worktrees with changes and PRs to review" width="820">
+  </picture>
 </p>
 
 <sub>Screenshots from a demo repository. The mod's interface is in Polish.</sub>
@@ -17,9 +19,9 @@ styled like an old CRT terminal (green phosphor on black, bloom, scanlines).
 ## What it does
 
 **Band above the prompt**
-- the branch with the GitHub mark — in inverse video (green background) when it is in sync with its remote
-- `↑N PUSH` / `↓N POBIERZ` — commits to push and to pull (a quiet, read-only `git fetch` every 5 minutes)
-- `●N ZMIANY` — uncommitted files in the current directory
+- the branch with the GitHub mark — green when it is in sync with its remote
+- `↑ N do push` / `↓ N do pobrania` — commits to push and to pull (a quiet, read-only `git fetch` every 5 minutes)
+- `● N zmian` — uncommitted files in the current directory
 - the repo's other worktrees that hold uncommitted changes
 - pull requests: how many wait for your review and how many came back with changes requested,
   with links to the newest of each
@@ -27,20 +29,20 @@ styled like an old CRT terminal (green phosphor on black, bloom, scanlines).
 
 **The “Drzewko git” pane** (opens by itself, or with `/git-tree`)
 - a graph of the last 50 commits, with branch and merge lines
-- click a commit to unfold its changed files with terminal-style status marks
-  (amber `[M]` modified, green `[A]` added, red `[D]` deleted, cyan `[R]` renamed) and `+/−` line counts;
+- click a commit to unfold its changed files with GitHub-style status dots
+  (amber **M** modified, green **A** added, red **D** deleted, blue **R** renamed) and `+/−` line counts;
   click a file to see its diff
-- **█ WYJAŚNIJ Z CLAUDE** (“explain with Claude”, with a blinking cursor) drafts a question about
+- **✨ Wyjaśnij z Claude** (“explain with Claude”) drafts a question about
   the commit into the prompt box: what it changes, why, and whether anything in it looks risky —
   just press Enter; nothing is sent for you
 - bot branches (dependabot, renovate) are always hidden; branches already merged
-  (squash merges included) hide with one button, `▒ SCALONE`
+  (squash merges included) hide with one button, 🧹
 - lists of PRs to review and to fix, as links
 - inside a worktree: a button that closes the worktree and moves its changes into the main
   checkout as staged changes (no commit, no push); it refuses when the worktree is locked
 
-In the desktop app the graph, the band and the status marks are drawn as SVG; in the terminal,
-as text. All colours of the look live in one file, `hooks/theme.ts`.
+In the desktop app the graph, the band and the status dots are drawn as SVG; in the terminal,
+as text.
 
 ## Install
 
@@ -73,9 +75,8 @@ claude plugin test .
 ```
 
 Code: `hooks/register.tsx` (hooks, pane, band), `hooks/graph.ts` (graph layout and lanes),
-`hooks/band.ts` (the band as SVG, icons, status marks), `hooks/commit.ts` (a commit's files and diff),
-`hooks/merged.ts` (merged-branch detection), `hooks/worktree.ts`, `hooks/prs.ts`,
-`hooks/theme.ts` (the CRT palette).
+`hooks/band.ts` (the band as SVG, icons, status dots), `hooks/commit.ts` (a commit's files and diff),
+`hooks/merged.ts` (merged-branch detection), `hooks/worktree.ts`, `hooks/prs.ts`.
 
 ## License
 

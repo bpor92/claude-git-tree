@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { CURSOR, boldSans, plural, renderBand, statusDot } from './band'
+import { boldSans, plural, renderBand, statusDot } from './band'
 import { parseFiles } from './commit'
 import { isBot, parseSearch, toReview } from './prs'
 import { ROW_H, asciiRows, laneWindow, layout, parseLog, renderLanes } from './graph'
@@ -144,13 +144,13 @@ test('clicking a commit lists its files under it; clicking a file shows its diff
     const ui = await $.ui.mount({ plugin: 'git-tree', surface, component: 'Pane', requestId: 'git-tree', props: PANE_PROPS })
     await ui.press({ key: 'refresh' })
     await ui.press({ key: 'c-b000001' })
-    expect(await ui.find({ type: 'Text', text: /ZMIANY W b000001/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /Zmiany w b000001/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /2 pliki/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: '+5' })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: '−1' })).toBeDefined()
     if (surface === 'desktop') {
-      // icon + 4 lane slices + the cursor of "Wyjaśnij" + 2 status marks
-      expect(await ui.findAll({ type: 'Svg' })).toHaveLength(8)
+      // icon + 4 lane slices + 2 status dots
+      expect(await ui.findAll({ type: 'Svg' })).toHaveLength(7)
     }
     expect(await ui.find({ type: 'Button', key: 'file-b000001-src/a.ts' })).toBeDefined()
     await ui.press({ key: 'file-b000001-src/a.ts' })
@@ -335,9 +335,9 @@ test('band above the prompt shows push and pull counts on every surface', async 
       // one image of pills plus the tree glyph; the counts live in the image
       expect(await band.findAll({ type: 'Svg' })).toHaveLength(2)
       const drawn = JSON.stringify(await band.drawn())
-      expect(drawn).toContain('↑2 PUSH')
-      expect(drawn).toContain('↓3 POBIERZ')
-      expect(drawn).toContain('●1 ZMIANA')
+      expect(drawn).toContain('↑ 2 do push')
+      expect(drawn).toContain('↓ 3 do pobrania')
+      expect(drawn).toContain('1 zmiana')
     } else {
       expect(await band.find({ type: 'Text', text: /↑2 do push/ })).toBeDefined()
       expect(await band.find({ type: 'Text', text: /↓3 do pobrania/ })).toBeDefined()
@@ -402,7 +402,7 @@ test('band names the other worktrees that hold uncommitted changes', async ($, o
       props: { hasSurvey: false, isWorking: false, maxRows: 3, bodyColumns: 100 } as never,
     })
     if (surface === 'desktop') {
-      expect(JSON.stringify(await band.drawn())).toContain('GRAF-C:2')
+      expect(JSON.stringify(await band.drawn())).toContain('graf-c')
     } else {
       expect(await band.find({ type: 'Text', text: /niezacommitowane w worktree:.*graf-c ●2/ })).toBeDefined()
     }
@@ -410,48 +410,43 @@ test('band names the other worktrees that hold uncommitted changes', async ($, o
   }
 })
 
-describe('band (CRT terminal)', () => {
+describe('band pills', () => {
   const base = { branch: 'master', isWorktree: false, hasUpstream: true, ahead: 0, behind: 0, dirty: 0, others: [], prs: null }
-  test('PR segment: review in cyan, sent back in red, dim zeros, none when unknown', async () => {
+  test('PR pill: counts in colour when there is work, grey zeros when none, no pill when unknown', async () => {
     const busy = renderBand({ ...base, prs: { toReview: 2, changesRequested: 1 } }).source
-    expect(busy).toContain('<tspan fill="#5CFFE0">2 REVIEW</tspan>')
-    expect(busy).toContain('<tspan fill="#FF5555">1 POPRAWA</tspan>')
+    expect(busy).toContain('2 do review')
+    expect(busy).toContain('1 do poprawy')
+    expect(busy).toContain('class="fg-red"')
     const calm = renderBand({ ...base, prs: { toReview: 0, changesRequested: 0 } }).source
-    expect(calm).toContain('<tspan fill="#1F9F45">0 REVIEW</tspan>')
-    expect(calm).not.toContain('#FF5555')
-    expect(renderBand(base).source).not.toContain('REVIEW')
+    expect(calm).toContain('0 do review')
+    expect(calm).not.toContain('class="fg-red"')
+    expect(renderBand(base).source).not.toContain('do review')
   })
-  test('a synced branch goes inverse video, no segment of its own; counts and plurals otherwise', async () => {
+  test('a synced branch turns its own pill green, no separate pill; counts and plurals otherwise', async () => {
     const synced = renderBand(base).source
-    expect(synced).toContain('<rect x="8" y="3" width="')
-    expect(synced).toContain('<tspan fill="#050A06">MASTER</tspan>')
+    expect(synced).toContain('<rect class="bg-green"')
+    expect(synced).not.toContain('aktualne')
+    expect(synced.match(/<rect /g)).toHaveLength(1)
     const ahead = renderBand({ ...base, ahead: 1 }).source
-    expect(ahead).toContain('<tspan fill="#33FF66">MASTER</tspan>')
+    expect(ahead).toContain('<rect class="bg-plain"')
+    expect(ahead).not.toContain('<rect class="bg-green"')
     const busy = renderBand({ ...base, ahead: 2, behind: 5, dirty: 12 }).source
-    expect(busy).toContain('↑2 PUSH')
-    expect(busy).toContain('↓5 POBIERZ')
-    expect(busy).toContain('●12 ZMIAN')
+    expect(busy).toContain('↑ 2 do push')
+    expect(busy).toContain('↓ 5 do pobrania')
+    expect(busy).toContain('12 zmian')
+    expect(busy).not.toContain('aktualne')
     expect(plural(3, 'zmiana', 'zmiany', 'zmian')).toBe('zmiany')
     expect(plural(22, 'zmiana', 'zmiany', 'zmian')).toBe('zmiany')
     expect(plural(13, 'zmiana', 'zmiany', 'zmian')).toBe('zmian')
   })
-  test('the tube: black ground, phosphor bloom, scanlines; nothing blinks in the band', async () => {
-    const svg = renderBand(base).source
-    expect(svg).toContain('fill="#050A06"')
-    expect(svg).toContain('filter="url(#glow)"')
-    expect(svg).toContain('fill="url(#scan)"')
-    expect(svg).not.toContain('<animate')
-    // the blinking cursor leads "Wyjaśnij z Claude" instead
-    expect(CURSOR).toContain('<animate attributeName="opacity"')
-  })
   test('other worktrees: named up to four, counted past that; names are escaped', async () => {
     const few = renderBand({ ...base, others: [{ name: 'graf-a', dirty: 2 }, { name: '<x>', dirty: 1 }] }).source
-    expect(few).toContain('GRAF-A:2')
-    expect(few).toContain('&lt;X&gt;:1')
+    expect(few).toContain('graf-a')
+    expect(few).toContain('&lt;x&gt;')
     const many = Array.from({ length: 6 }, (_, i) => ({ name: `w${i}`, dirty: 1 }))
-    expect(renderBand({ ...base, others: many }).source).toContain('6 WORKTREE')
+    expect(renderBand({ ...base, others: many }).source).toContain('6 worktree ze zmianami')
   })
-  test('the image is as wide as its segments', async () => {
+  test('the image is as wide as its pills', async () => {
     const short = renderBand(base)
     const long = renderBand({ ...base, branch: 'feature/a-much-longer-branch-name' })
     expect(long.width).toBeGreaterThan(short.width)
@@ -459,19 +454,17 @@ describe('band (CRT terminal)', () => {
   })
 })
 
-test('heavy letters: Latin, digits and Polish diacritics, everything else unchanged', async () => {
+test('heavy letters: Latin and digits; letters with diacritics and the rest unchanged', async () => {
   expect(boldSans('AZ az 09')).toBe('𝗔𝗭 𝗮𝘇 𝟬𝟵')
-  // letters with diacritics stay whole: a combining accent on a heavy letter is dropped by fonts
-  expect(boldSans('Ś')).toBe('Ś')
-  expect(boldSans('WYJAŚNIJ Z CLAUDE')).toBe('𝗪𝗬𝗝𝗔Ś𝗡𝗜𝗝 𝗭 𝗖𝗟𝗔𝗨𝗗𝗘')
-  expect(boldSans('#1 ▶')).toBe('#𝟭 ▶')
+  expect(boldSans('Wyjaśnij z Claude')).toBe('𝗪𝘆𝗷𝗮ś𝗻𝗶𝗷 𝘇 𝗖𝗹𝗮𝘂𝗱𝗲')
+  expect(boldSans('#1 ✨')).toBe('#𝟭 ✨')
 })
 
-test('status marks are terminal brackets: amber M, green A, red D', async () => {
-  expect(statusDot('M')).toContain('fill="#FFB000"')
-  expect(statusDot('A')).toContain('fill="#33FF66"')
-  expect(statusDot('D')).toContain('fill="#FF5555"')
-  expect(statusDot('R087')).toContain('>[R]</text>')
+test('status dots use GitHub colours and carry their letter', async () => {
+  expect(statusDot('M')).toContain('#D29922')
+  expect(statusDot('A')).toContain('#3FB950')
+  expect(statusDot('D')).toContain('#F85149')
+  expect(statusDot('M')).toContain('>M</text>')
 })
 
 describe('pull requests', () => {
@@ -542,8 +535,8 @@ describe('pull requests', () => {
     })
     const ui = await $.ui.mount({ plugin: 'git-tree', surface: 'desktop', component: 'Pane', requestId: 'git-tree', props: PANE_PROPS })
     await ui.press({ key: 'refresh' })
-    expect(await ui.find({ type: 'Text', text: /DO POPRAWY PO REVIEW/ })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: /CZEKAJĄ NA TWOJE REVIEW \(1\)/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /Do poprawy po review/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /Czekają na Twoje review \(1\)/ })).toBeDefined()
     expect(JSON.stringify(await ui.drawn())).toContain('https://github.com/acme/app/pull/7')
     expect(JSON.stringify(await ui.drawn())).not.toContain('/pull/123')
     await ui.unmount()

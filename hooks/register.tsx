@@ -14,12 +14,11 @@ import type {
   WorktreeInfo,
 } from '../types'
 import { loadPrs } from './prs'
-import { CURSOR, TREE_ICON, boldSans, renderBand, statusDot } from './band'
+import { TREE_ICON, boldSans, renderBand, statusDot } from './band'
 import { loadCommit, loadFileDiff } from './commit'
 import { ROW_H, SEP, ago, asciiRows, laneWindow, parseLog, refChips, renderLanes } from './graph'
 import type { Lanes, RefKind } from './graph'
 import { BOT_BRANCHES, scanMerged } from './merged'
-import { CRT } from './theme'
 import { checkLock, closeWorktree, detectWorktree, dirtyWorktrees, lockMessage } from './worktree'
 import type { Run } from './worktree'
 
@@ -75,7 +74,7 @@ const FETCH_MS = 5 * 60_000
 
 // GitHub's mark (octicon mark-github), tinted like the branch name beside it
 const GITHUB_ICON =
-  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16"><path fill="#33FF66" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>'
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16"><path fill="#5BB450" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>'
 
 const runner = ($: EngineInterface): Run => (argv, cwd) =>
   $.process.run(argv, cwd ? { cwd, timeoutMs: 120_000 } : { timeoutMs: 120_000 })
@@ -183,8 +182,8 @@ async function toggleCommit($: EngineInterface, hash: string) {
   if ((await read($, selected))?.hash === hash) await update($, selected, () => detail)
 }
 
-/** The "Wyjaśnij z Claude" pill: a faint wash of phosphor behind its text. */
-const EXPLAIN_FILL = CRT.faint
+/** The "Wyjaśnij z Claude" pill: the purple of the README screenshot. */
+const EXPLAIN_PURPLE = '#7C5CD6'
 
 export function explainPrompt(hash: string, subject: string): string {
   return (
@@ -272,8 +271,8 @@ function clock(ms: number): string {
   return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
 }
 
-const CHIP_COLOR: Record<RefKind, string> = { head: '#B6FF5C', remote: CRT.amber, tag: '#FF8C3A', local: CRT.green }
-const FILE_COLOR: Record<string, string> = { A: CRT.green, M: CRT.amber, D: CRT.red, R: CRT.cyan, C: CRT.cyan }
+const CHIP_COLOR: Record<RefKind, string> = { head: 'claude', remote: 'warning', tag: 'merged', local: 'success' }
+const FILE_COLOR: Record<string, string> = { A: 'success', M: 'warning', D: 'error', R: 'suggestion', C: 'suggestion' }
 const FILE_LABEL: Record<string, string> = { A: 'nowy', M: 'zmieniony', D: 'usunięty', R: 'przeniesiony', C: 'skopiowany', T: 'zmiana typu' }
 
 export function filesSummary(files: ChangedFile[]): string {
@@ -391,34 +390,34 @@ export const register: Register = on => {
         <Box flexDirection="row" gap={2} alignItems="center" key="git-band">
           <Box flexDirection="row" gap={1} alignItems="center" key="band-branch">
             {/* green branch = in step with its remote; no separate "synced" word */}
-            <Text color={synced ? CRT.green : CRT.dim}>⎇</Text>
-            <Text bold color={synced ? CRT.green : CRT.dim}>
+            <Text color={synced ? 'success' : 'text'}>⎇</Text>
+            <Text bold color={synced ? 'success' : 'text'}>
               {st.branch}
             </Text>
-            {wt && <Text color={CRT.green}>⑂ worktree</Text>}
+            {wt && <Text color="claude">⑂ worktree</Text>}
           </Box>
           {!st.tracking && <Text dimColor>brak gałęzi zdalnej</Text>}
           {st.ahead > 0 && (
-            <Text bold color={CRT.amber}>
+            <Text bold color="warning">
               ↑{st.ahead} do push
             </Text>
           )}
           {st.behind > 0 && (
-            <Text bold color={CRT.cyan}>
+            <Text bold color="suggestion">
               ↓{st.behind} do pobrania
             </Text>
           )}
-          {st.dirty > 0 && <Text color={CRT.amber}>● {st.dirty} niezacommitowane</Text>}
+          {st.dirty > 0 && <Text color="warning">● {st.dirty} niezacommitowane</Text>}
           {others.length > 0 && (
-            <Text color={CRT.amber}>
+            <Text color="warning">
               <Text bold>⑂ niezacommitowane w worktree:</Text> {dirtyWorktreesLabel(others)}
             </Text>
           )}
           {pr && (
             <Text>
-              <Text color={pr.toReview.length ? CRT.cyan : CRT.dim}>PR: {pr.toReview.length} do review</Text>
+              <Text color={pr.toReview.length ? 'suggestion' : 'inactive'}>PR: {pr.toReview.length} do review</Text>
               <Text dimColor> · </Text>
-              <Text color={pr.changesRequested.length ? CRT.red : CRT.dim}>{pr.changesRequested.length} do poprawy</Text>
+              <Text color={pr.changesRequested.length ? 'error' : 'inactive'}>{pr.changesRequested.length} do poprawy</Text>
             </Text>
           )}
           {prLinks}
@@ -466,8 +465,8 @@ export const register: Register = on => {
       )
     const prList = pr && (pr.toReview.length > 0 || pr.changesRequested.length > 0) && (
       <Box flexDirection="column" key="prs">
-        {prSection('DO POPRAWY PO REVIEW', CRT.red, pr.changesRequested, 'pr-back')}
-        {prSection('CZEKAJĄ NA TWOJE REVIEW', CRT.cyan, pr.toReview, 'pr-review')}
+        {prSection('Do poprawy po review', 'error', pr.changesRequested, 'pr-back')}
+        {prSection('Czekają na Twoje review', 'suggestion', pr.toReview, 'pr-review')}
       </Box>
     )
 
@@ -475,7 +474,7 @@ export const register: Register = on => {
       <Box flexDirection="column" key="worktree" marginTop={1}>
         {wt && (
           <Box flexDirection="row" gap={1} key="wt-info">
-            <Text color={CRT.green} bold>
+            <Text color="claude" bold>
               ⑂ worktree {wt.branch}
             </Text>
             <Text dimColor>
@@ -495,7 +494,7 @@ export const register: Register = on => {
         )}
         {wt && cl.phase === 'confirm' && (
           <Box flexDirection="column" key="wt-confirm">
-            <Text color={CRT.amber}>
+            <Text color="warning">
               Niezacommitowane zmiany w worktree zostaną zacommitowane, a cała gałąź {wt.branch} trafi do{' '}
               {wt.mainBranch} jako staged (bez commita). Potem usunę folder {wt.path} i gałąź {wt.branch}. Bez
               push.
@@ -506,10 +505,10 @@ export const register: Register = on => {
             </Box>
           </Box>
         )}
-        {cl.phase === 'running' && <Text color={CRT.amber}>Zamykam worktree…</Text>}
+        {cl.phase === 'running' && <Text color="warning">Zamykam worktree…</Text>}
         {cl.phase === 'done' && (
           <Box flexDirection="column" key="wt-done">
-            <Text color={cl.ok ? CRT.green : CRT.red}>
+            <Text color={cl.ok ? 'success' : 'error'}>
               {cl.ok ? '✓ ' : '✗ '}
               {cl.message}
             </Text>
@@ -533,22 +532,22 @@ export const register: Register = on => {
           {Svg ? (
             <Box flexDirection="row" gap={1} alignItems="center" key="branch">
               <Svg key="gh-icon" source={GITHUB_ICON} alt="GitHub" width={16} height={16} />
-              <Text bold color={CRT.green}>
+              <Text bold color="success">
                 {st?.branch ?? '?'}
               </Text>
             </Box>
           ) : (
-            <Text bold color={CRT.green}>
+            <Text bold color="success">
               {st ? `⎇ ${st.branch}` : '⎇ ?'}
             </Text>
           )}
           {st?.tracking && <Text dimColor>→ {st.tracking}</Text>}
-          {st && st.ahead > 0 && <Text color={CRT.amber}>↑{st.ahead} do push</Text>}
-          {st && st.behind > 0 && <Text color={CRT.cyan}>↓{st.behind} do pobrania</Text>}
+          {st && st.ahead > 0 && <Text color="warning">↑{st.ahead} do push</Text>}
+          {st && st.behind > 0 && <Text color="suggestion">↓{st.behind} do pobrania</Text>}
           {st && st.dirty > 0 ? (
-            <Text color={CRT.amber}>● {st.dirty} niezacommitowane</Text>
+            <Text color="warning">● {st.dirty} niezacommitowane</Text>
           ) : (
-            st && <Text color={CRT.green}>✓ czysto</Text>
+            st && <Text color="success">✓ czysto</Text>
           )}
           <Text dimColor>· {clock(at)}</Text>
         </Box>
@@ -556,7 +555,7 @@ export const register: Register = on => {
           <Button
             key="refresh"
             variant="secondary"
-            label="↻ ODŚWIEŻ"
+            label="↻ Odśwież"
             onPress={() => Promise.all([refresh($, true), refreshPrs($)])}
           />
           <Button
@@ -564,8 +563,8 @@ export const register: Register = on => {
             variant="secondary"
             label={
               hideM
-                ? `▒ SCALONE: UKRYTE${hiddenN === null ? ' (LICZĘ…)' : ` (${hiddenN})`}`
-                : '▒ SCALONE: WIDOCZNE'
+                ? `🧹 Scalone: ukryte${hiddenN === null ? ' (liczę…)' : ` (${hiddenN})`}`
+                : '🧹 Scalone: widoczne'
             }
             onPress={async () => {
               await update($, hideMerged, v => !v)
@@ -582,7 +581,7 @@ export const register: Register = on => {
       return (
         <Box flexDirection="column">
           {header}
-          <Text color={CRT.red}>{err}</Text>
+          <Text color="error">{err}</Text>
         </Box>
       )
     }
@@ -605,53 +604,45 @@ export const register: Register = on => {
         marginLeft={2}
         paddingX={1}
         borderStyle="round"
-        borderColor={CRT.green}
+        borderColor="claude"
       >
         <Box flexDirection="row" alignItems="center" gap={2} key={`detail-head-${d.hash}`}>
-          <Text bold color={CRT.green}>
-            ZMIANY W {d.hash}
+          <Text bold color="claude">
+            Zmiany w {d.hash}
           </Text>
-          {/* styled like a band segment: a square phosphor frame on the tube. A Button takes no
-              colour of its own, so a borderless one sits in the frame; it is led by a blinking
-              block cursor, an image (a Button cannot animate), so the text is what clicks */}
+          {/* a Button takes no colour of its own: a borderless one sits in a purple pill, rounded
+              by a round border in the same purple (a Box has no corner radius of its own); desktop
+              draws its text plain, so heavy letters stand in for bold there (the label keeps the
+              plain name for screen readers) */}
           <Box
-            key={`explain-frame-${d.hash}`}
-            flexDirection="row"
-            alignItems="center"
-            gap={1}
-            borderStyle="single"
-            borderColor={CRT.green}
-            backgroundColor={CRT.bg}
+            key={`explain-pill-${d.hash}`}
+            backgroundColor={EXPLAIN_PURPLE}
+            borderStyle="round"
+            borderColor={EXPLAIN_PURPLE}
             paddingX={1}
+            // desktop reads a numeric height as rows of text: one row keeps the rounded pill low
+            height={1}
+            alignItems="center"
           >
-            {Svg ? (
-              <Svg key={`explain-cursor-${d.hash}`} source={CURSOR} alt="kursor" width={8} height={14} />
-            ) : (
-              <Text color={CRT.green}>█</Text>
-            )}
             <Button
               key={`explain-${d.hash}`}
               plain
-              label="Wyjaśnij z Claude"
-              hover={{ color: CRT.green, backgroundColor: EXPLAIN_FILL }}
+              label="✨ Wyjaśnij z Claude"
+              hover={{ color: '#FFFFFF' }}
               onPress={() => explainCommit($, d.hash, list.find(c => c.hash === d.hash)?.subject ?? '')}
             >
-              {/* desktop draws a Button's text plain, so heavy letters stand in for bold there;
-                  the label above keeps the plain name for screen readers */}
-              <Text bold color={CRT.green}>
-                {Svg ? boldSans('WYJAŚNIJ Z CLAUDE') : 'WYJAŚNIJ Z CLAUDE'}
-              </Text>
+              <Text bold>{Svg ? `✨ ${boldSans('Wyjaśnij z Claude')}` : '✨ Wyjaśnij z Claude'}</Text>
             </Button>
           </Box>
         </Box>
         {d.isLoading && <Text dimColor>Wczytuję zmiany…</Text>}
-        {d.error && <Text color={CRT.red}>{d.error}</Text>}
+        {d.error && <Text color="error">{d.error}</Text>}
         {!d.isLoading && !d.error && d.files.length === 0 && <Text dimColor>Ten commit nie zmienia żadnych plików.</Text>}
         {d.files.length > 0 && (
           <Box flexDirection="row" gap={1} key={`summary-${d.hash}`} marginBottom={1}>
             <Text dimColor>{filesSummary(d.files).replace(/ · .*/, '')} ·</Text>
-            <Text color={CRT.green}>+{d.files.reduce((n, f) => n + (f.added ?? 0), 0)}</Text>
-            <Text color={CRT.red}>−{d.files.reduce((n, f) => n + (f.deleted ?? 0), 0)}</Text>
+            <Text color="success">+{d.files.reduce((n, f) => n + (f.added ?? 0), 0)}</Text>
+            <Text color="error">−{d.files.reduce((n, f) => n + (f.deleted ?? 0), 0)}</Text>
             <Text dimColor>— kliknij plik, by zobaczyć diff</Text>
           </Box>
         )}
@@ -666,11 +657,11 @@ export const register: Register = on => {
                     key={`dot-${f.path}`}
                     source={statusDot(f.status)}
                     alt={FILE_LABEL[f.status] ?? f.status}
-                    width={26}
+                    width={16}
                     height={16}
                   />
                 ) : (
-                  <Text bold color={FILE_COLOR[f.status] ?? CRT.dim}>
+                  <Text bold color={FILE_COLOR[f.status] ?? 'text'}>
                     ● {f.status}
                   </Text>
                 )}
@@ -684,7 +675,7 @@ export const register: Register = on => {
                   <Text dimColor>binarny</Text>
                 ) : (
                   <Text>
-                    <Text color={CRT.green}>+{f.added}</Text> <Text color={CRT.red}>−{f.deleted}</Text>
+                    <Text color="success">+{f.added}</Text> <Text color="error">−{f.deleted}</Text>
                   </Text>
                 )}
               </Box>
@@ -710,9 +701,9 @@ export const register: Register = on => {
       const isHead = c.refs.some(ref => ref.startsWith('HEAD'))
       return (
         <Button key={`c-${c.hash}`} plain onPress={() => toggleCommit($, c.hash)}>
-          {prefix ? <Text color={CRT.green}>{prefix}</Text> : ''}
+          {prefix ? <Text color="claude">{prefix}</Text> : ''}
           <Text dimColor>{isOpen ? '▾ ' : '▸ '}</Text>
-          <Text color={CRT.cyan}>{c.hash}</Text>{' '}
+          <Text color="suggestion">{c.hash}</Text>{' '}
           {refChips(c.refs).map(chip => (
             <Text bold color={CHIP_COLOR[chip.kind]}>
               [{chip.label}]{' '}
@@ -746,7 +737,7 @@ export const register: Register = on => {
     const lanes = cachedLanes(list, at)
 
     return (
-      <Box flexDirection="column" backgroundColor={CRT.bg} paddingX={1}>
+      <Box flexDirection="column">
         {header}
         {list.map((c, i) => (
           <Box flexDirection="column" key={`r-${c.hash}`}>
