@@ -1,4 +1,5 @@
 import type { Commit } from '../types'
+import { CRT, GLOW_FILTER, LANE_COLORS } from './theme'
 
 export type Row = { lane: number; through: number[]; isMerge: boolean }
 export type Edge = {
@@ -99,8 +100,7 @@ export function ago(ms: number, now: number): string {
   return `${Math.round(mo / 12)} l.`
 }
 
-const LANE_COLORS = ['#7F77DD', '#1D9E75', '#D85A30', '#378ADD', '#D4537E', '#BA7517', '#639922', '#888780']
-const color = (lane: number) => LANE_COLORS[lane % LANE_COLORS.length] ?? '#888780'
+const color = (lane: number) => LANE_COLORS[lane % LANE_COLORS.length] ?? CRT.dim
 
 export type RefKind = 'head' | 'local' | 'remote' | 'tag'
 
@@ -202,8 +202,9 @@ export function laneWindow(l: Lanes, from: number, to: number): { source: string
     height,
     source:
       `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 ${top} ${l.width} ${height}" width="${l.width}" height="${height}">` +
-      `<style>.e{fill:none;stroke-width:2}.o{stroke-dasharray:3 3;opacity:.7}.bg{fill:#fff}@media (prefers-color-scheme:dark){.bg{fill:#262624}}</style>` +
-      `${inner}</svg>`,
+      `<defs>${GLOW_FILTER}</defs><style>.e{fill:none;stroke-width:2}.o{stroke-dasharray:2 3;opacity:.7}.bg{fill:${CRT.bg}}</style>` +
+      // the tube behind the lines, phosphor bloom on them
+      `<rect x="0" y="${top}" width="${l.width}" height="${height}" fill="${CRT.bg}"/><g filter="url(#glow)">${inner}</g></svg>`,
   }
 }
 

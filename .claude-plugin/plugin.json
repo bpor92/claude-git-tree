@@ -1,7 +1,7 @@
 {
   "name": "git-tree",
-  "version": "0.2.0",
-  "description": "Drzewko git w Claude Code: graf commitów z plikami i diffem, pasek z gałęzią, push/pull, zmianami w worktree i PR-ami",
+  "version": "0.3.0",
+  "description": "A git tree for Claude Code in a CRT terminal style: commit graph with files and diffs, a band with branch, push/pull, worktree changes and PRs",
   "homepage": "https://github.com/bpor92/claude-git-tree",
   "types": "./types/index.d.ts",
   "author": {

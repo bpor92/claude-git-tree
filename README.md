@@ -1,82 +1,82 @@
-# git-tree — drzewko git dla Claude Code
+# git-tree — a git tree for Claude Code
 
-Mod do [Claude Code](https://claude.com/claude-code), który pokazuje stan repozytorium git
-bezpośrednio w interfejsie: graf commitów w panelu obok rozmowy i pasek statusu nad polem
-wpisywania.
+A [Claude Code](https://claude.com/claude-code) mod that shows your git repository right in the
+interface: a commit graph in a pane beside the conversation and a status band above the prompt —
+styled like an old CRT terminal (green phosphor on black, bloom, scanlines).
 
 <p align="center">
-  <img src="docs/panel.png" alt="Panel Drzewko git: graf commitów z rozwiniętym commitem, kolorowymi statusami plików, diffem i przyciskiem Wyjaśnij z Claude" width="720">
+  <img src="docs/panel.png" alt="The git tree pane in a CRT terminal style: commit graph, an opened commit with [M] and [A] status marks, a diff, and the Explain with Claude button with a blinking cursor" width="740">
 </p>
 
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/pasek-ciemny.png">
-    <img src="docs/pasek-jasny.png" alt="Pasek nad polem wpisywania: gałąź, commity do push, zmiany, worktree ze zmianami i PR-y do review" width="820">
-  </picture>
+  <img src="docs/pasek.png" alt="The band above the prompt in a terminal style: branch, commits to push, changes, worktrees with changes and PRs to review" width="820">
 </p>
 
-<sub>Zrzuty z repozytorium demonstracyjnego.</sub>
+<sub>Screenshots from a demo repository. The mod's interface is in Polish.</sub>
 
-## Co robi
+## What it does
 
-**Pasek nad polem wpisywania**
-- gałąź z logo GitHuba — zielona, gdy jest zsynchronizowana ze zdalną
-- `↑ N do push` / `↓ N do pobrania` (co 5 minut ciche `git fetch`, tylko odczyt)
-- `● N zmian` — niezacommitowane pliki w bieżącym katalogu
-- inne worktree repo, które mają niezacommitowane zmiany
-- PR-y: ile czeka na Twoje review i ile wróciło do poprawy, z linkami do najnowszych
-- ikona drzewka i `›` otwierające panel
+**Band above the prompt**
+- the branch with the GitHub mark — in inverse video (green background) when it is in sync with its remote
+- `↑N PUSH` / `↓N POBIERZ` — commits to push and to pull (a quiet, read-only `git fetch` every 5 minutes)
+- `●N ZMIANY` — uncommitted files in the current directory
+- the repo's other worktrees that hold uncommitted changes
+- pull requests: how many wait for your review and how many came back with changes requested,
+  with links to the newest of each
+- a tree glyph and `›` that open the pane
 
-**Panel „Drzewko git”** (otwiera się sam albo komendą `/git-tree`)
-- graf ostatnich 50 commitów z liniami gałęzi i scaleń
-- kliknięcie commita rozwija listę zmienionych plików ze statusem jak na GitHubie
-  (żółte **M**, zielone **A**, czerwone **D**, niebieskie **R**) i liczbą linii `+/−`;
-  kliknięcie pliku pokazuje jego diff
-- **✨ Wyjaśnij z Claude** przy rozwiniętym commicie wpisuje do pola gotowe pytanie:
-  co commit zmienia, dlaczego i czy coś w nim budzi wątpliwości — wystarczy Enter
-- gałęzie botów (dependabot, renovate) są zawsze ukryte; gałęzie już scalone
-  (także przez squash) można ukryć przyciskiem 🧹
-- lista PR-ów do review i do poprawy z linkami
-- w worktree: przycisk, który zamyka worktree i przenosi jego zmiany do głównego repo
-  jako staged (bez commita, bez push); odmawia, gdy worktree jest zablokowane
+**The “Drzewko git” pane** (opens by itself, or with `/git-tree`)
+- a graph of the last 50 commits, with branch and merge lines
+- click a commit to unfold its changed files with terminal-style status marks
+  (amber `[M]` modified, green `[A]` added, red `[D]` deleted, cyan `[R]` renamed) and `+/−` line counts;
+  click a file to see its diff
+- **█ WYJAŚNIJ Z CLAUDE** (“explain with Claude”, with a blinking cursor) drafts a question about
+  the commit into the prompt box: what it changes, why, and whether anything in it looks risky —
+  just press Enter; nothing is sent for you
+- bot branches (dependabot, renovate) are always hidden; branches already merged
+  (squash merges included) hide with one button, `▒ SCALONE`
+- lists of PRs to review and to fix, as links
+- inside a worktree: a button that closes the worktree and moves its changes into the main
+  checkout as staged changes (no commit, no push); it refuses when the worktree is locked
 
-W aplikacji desktop graf i pasek są rysowane jako grafika (SVG), w terminalu — tekstem.
+In the desktop app the graph, the band and the status marks are drawn as SVG; in the terminal,
+as text. All colours of the look live in one file, `hooks/theme.ts`.
 
-## Instalacja
+## Install
 
-W sesji Claude Code w terminalu:
+In a Claude Code session in a terminal:
 
 ```
 /plugin install git-tree --marketplace bpor92/claude-git-tree
 ```
 
-Potwierdź dodanie marketplace (`y`) i wybierz zakres użytkownika (user), żeby mod działał
-we wszystkich projektach. Zainstalowany z terminala działa też w lokalnych sesjach aplikacji
-desktop.
+Confirm adding the marketplace (`y`) and pick the user scope so the mod works in every project.
+Installed from a terminal, it also loads in local sessions of the desktop app.
 
-### Wymagania
+### Requirements
 
 - `git`
-- [`gh`](https://cli.github.com/) zalogowany do GitHuba (`gh auth login`) — tylko dla
-  liczników i list PR-ów; bez niego reszta działa, a etykieta PR się nie pokazuje
+- [`gh`](https://cli.github.com/) signed in to GitHub (`gh auth login`) — only for the PR counts and
+  lists; without it everything else works and the PR segment stays hidden
 
-## Co mod uruchamia
+## What it runs
 
-Wyłącznie lokalne komendy `git` (odczyt stanu, a zapis tylko po kliknięciu przycisku
-zamykania worktree), co 5 minut `git fetch --quiet --no-tags` oraz zapytania
-`gh search prs` / `gh api user` (tylko odczyt). Nic nie jest wypychane (`push`).
+Only local `git` commands (reading state; it writes only when you press the close-worktree button),
+`git fetch --quiet --no-tags` every 5 minutes, and read-only `gh search prs` / `gh api user` queries.
+Nothing is ever pushed.
 
-## Rozwój
+## Development
 
 ```
 claude plugin validate .
 claude plugin test .
 ```
 
-Kod: `hooks/register.tsx` (rejestracja, panel, pasek), `hooks/graph.ts` (układ grafu),
-`hooks/band.ts` (pasek jako SVG), `hooks/commit.ts` (pliki i diff commita),
-`hooks/merged.ts` (wykrywanie scalonych gałęzi), `hooks/worktree.ts`, `hooks/prs.ts`.
+Code: `hooks/register.tsx` (hooks, pane, band), `hooks/graph.ts` (graph layout and lanes),
+`hooks/band.ts` (the band as SVG, icons, status marks), `hooks/commit.ts` (a commit's files and diff),
+`hooks/merged.ts` (merged-branch detection), `hooks/worktree.ts`, `hooks/prs.ts`,
+`hooks/theme.ts` (the CRT palette).
 
-## Licencja
+## License
 
 [MIT](LICENSE)
