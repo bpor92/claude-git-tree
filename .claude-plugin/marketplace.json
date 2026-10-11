@@ -1,0 +1,6 @@
+{
+  "name": "bartek-mods",
+  "owner": { "name": "Bartek" },
+  "description": "Mody Claude Code autorstwa Bartka",
+  "plugins": [{ "name": "git-tree", "source": "./" }]
+}

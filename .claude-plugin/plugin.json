@@ -1,0 +1,10 @@
+{
+  "name": "git-tree",
+  "version": "0.2.0",
+  "description": "Drzewko git w Claude Code: graf commitów z plikami i diffem, pasek z gałęzią, push/pull, zmianami w worktree i PR-ami",
+  "homepage": "https://github.com/bpor92/claude-git-tree",
+  "types": "./types/index.d.ts",
+  "author": {
+    "name": "Bartek"
+  }
+}
