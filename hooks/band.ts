@@ -172,3 +172,17 @@ export const TREE_ICON =
   '<path d="M5 2v14" stroke="#A371F7"/><path d="M5 5c0 2.5 8 1.5 8 4.5S5 11.5 5 14" stroke="#3FB950"/>' +
   '<circle cx="5" cy="3" r="2" fill="#A371F7"/><circle cx="13" cy="9" r="2" fill="#3FB950"/><circle cx="5" cy="15" r="2" fill="#A371F7"/>' +
   '</svg>'
+
+/** GitHub's own status colours: modified amber, added green, deleted red, renamed blue. */
+const DOT_FILL: Record<string, string> = { A: '#3FB950', M: '#D29922', D: '#F85149', R: '#58A6FF', C: '#58A6FF', T: '#A371F7' }
+
+/** The status as a GitHub-style dot holding its letter (M, A, D, R…). */
+export function statusDot(status: string): string {
+  const fill = DOT_FILL[status] ?? '#8B949E'
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">` +
+    `<circle cx="8" cy="8" r="8" fill="${fill}"/>` +
+    `<text x="8" y="11.5" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="10" font-weight="700" fill="#fff">${status.replace(/[^A-Z]/g, '')}</text>` +
+    `</svg>`
+  )
+}

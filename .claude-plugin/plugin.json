@@ -6,5 +6,6 @@
   "types": "./types/index.d.ts",
   "author": {
     "name": "Bartek"
-  }
+  },
+  "license": "MIT"
 }

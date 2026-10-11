@@ -4,6 +4,19 @@ Mod do [Claude Code](https://claude.com/claude-code), który pokazuje stan repoz
 bezpośrednio w interfejsie: graf commitów w panelu obok rozmowy i pasek statusu nad polem
 wpisywania.
 
+<p align="center">
+  <img src="docs/panel.png" alt="Panel Drzewko git: graf commitów z rozwiniętym commitem, kolorowymi statusami plików, diffem i przyciskiem Wyjaśnij z Claude" width="720">
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/pasek-ciemny.png">
+    <img src="docs/pasek-jasny.png" alt="Pasek nad polem wpisywania: gałąź, commity do push, zmiany, worktree ze zmianami i PR-y do review" width="820">
+  </picture>
+</p>
+
+<sub>Zrzuty z repozytorium demonstracyjnego.</sub>
+
 ## Co robi
 
 **Pasek nad polem wpisywania**
@@ -19,6 +32,8 @@ wpisywania.
 - kliknięcie commita rozwija listę zmienionych plików ze statusem jak na GitHubie
   (żółte **M**, zielone **A**, czerwone **D**, niebieskie **R**) i liczbą linii `+/−`;
   kliknięcie pliku pokazuje jego diff
+- **✨ Wyjaśnij z Claude** przy rozwiniętym commicie wpisuje do pola gotowe pytanie:
+  co commit zmienia, dlaczego i czy coś w nim budzi wątpliwości — wystarczy Enter
 - gałęzie botów (dependabot, renovate) są zawsze ukryte; gałęzie już scalone
   (także przez squash) można ukryć przyciskiem 🧹
 - lista PR-ów do review i do poprawy z linkami
@@ -61,3 +76,7 @@ claude plugin test .
 Kod: `hooks/register.tsx` (rejestracja, panel, pasek), `hooks/graph.ts` (układ grafu),
 `hooks/band.ts` (pasek jako SVG), `hooks/commit.ts` (pliki i diff commita),
 `hooks/merged.ts` (wykrywanie scalonych gałęzi), `hooks/worktree.ts`, `hooks/prs.ts`.
+
+## Licencja
+
+[MIT](LICENSE)

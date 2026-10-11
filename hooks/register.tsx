@@ -14,7 +14,7 @@ import type {
   WorktreeInfo,
 } from '../types'
 import { loadPrs } from './prs'
-import { TREE_ICON, renderBand } from './band'
+import { TREE_ICON, renderBand, statusDot } from './band'
 import { loadCommit, loadFileDiff } from './commit'
 import { ROW_H, SEP, ago, asciiRows, laneWindow, parseLog, refChips, renderLanes } from './graph'
 import type { Lanes, RefKind } from './graph'
@@ -182,6 +182,23 @@ async function toggleCommit($: EngineInterface, hash: string) {
   if ((await read($, selected))?.hash === hash) await update($, selected, () => detail)
 }
 
+export function explainPrompt(hash: string, subject: string): string {
+  return (
+    `Wyjaśnij commit ${hash}${subject ? ` („${subject}”)` : ''}: przejrzyj go przez \`git show ${hash}\`, ` +
+    'opisz po ludzku, co i dlaczego zmienia, i wskaż, czy coś w nim budzi wątpliwości ' +
+    '(błędy, brakujące testy, ryzyko przy wdrożeniu).'
+  )
+}
+
+/**
+ * Writes a ready question about the commit into the prompt box as a draft: the person
+ * reads it, edits if they like and sends it with Enter. Nothing is submitted for them.
+ */
+async function explainCommit($: EngineInterface, hash: string, subject: string) {
+  const filled = await $.prompt.fill({ text: explainPrompt(hash, subject) }).catch(() => null)
+  $.ui.toast(filled?.isFilled ? 'Pytanie o commit jest w polu wpisywania — naciśnij Enter' : 'Nie udało się wpisać pytania do pola')
+}
+
 /** A click on a file shows its diff under it; a second click hides it. */
 async function toggleFile($: EngineInterface, hash: string, path: string) {
   const current = await read($, openFile)
@@ -254,19 +271,6 @@ function clock(ms: number): string {
 const CHIP_COLOR: Record<RefKind, string> = { head: 'claude', remote: 'warning', tag: 'merged', local: 'success' }
 const FILE_COLOR: Record<string, string> = { A: 'success', M: 'warning', D: 'error', R: 'suggestion', C: 'suggestion' }
 const FILE_LABEL: Record<string, string> = { A: 'nowy', M: 'zmieniony', D: 'usunięty', R: 'przeniesiony', C: 'skopiowany', T: 'zmiana typu' }
-/** GitHub's own status colours: modified amber, added green, deleted red, renamed blue. */
-const DOT_FILL: Record<string, string> = { A: '#3FB950', M: '#D29922', D: '#F85149', R: '#58A6FF', C: '#58A6FF', T: '#A371F7' }
-
-/** The status as a GitHub-style dot holding its letter (M, A, D, R…). */
-export function statusDot(status: string): string {
-  const fill = DOT_FILL[status] ?? '#8B949E'
-  return (
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">` +
-    `<circle cx="8" cy="8" r="8" fill="${fill}"/>` +
-    `<text x="8" y="11.5" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="10" font-weight="700" fill="#fff">${status.replace(/[^A-Z]/g, '')}</text>` +
-    `</svg>`
-  )
-}
 
 export function filesSummary(files: ChangedFile[]): string {
   const added = files.reduce((n, f) => n + (f.added ?? 0), 0)
@@ -599,9 +603,17 @@ export const register: Register = on => {
         borderStyle="round"
         borderColor="claude"
       >
-        <Text bold color="claude">
-          Zmiany w {d.hash}
-        </Text>
+        <Box flexDirection="row" alignItems="center" gap={2} key={`detail-head-${d.hash}`}>
+          <Text bold color="claude">
+            Zmiany w {d.hash}
+          </Text>
+          <Button
+            key={`explain-${d.hash}`}
+            variant="primary"
+            label="✨ Wyjaśnij z Claude"
+            onPress={() => explainCommit($, d.hash, list.find(c => c.hash === d.hash)?.subject ?? '')}
+          />
+        </Box>
         {d.isLoading && <Text dimColor>Wczytuję zmiany…</Text>}
         {d.error && <Text color="error">{d.error}</Text>}
         {!d.isLoading && !d.error && d.files.length === 0 && <Text dimColor>Ten commit nie zmienia żadnych plików.</Text>}

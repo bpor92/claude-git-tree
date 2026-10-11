@@ -1,11 +1,11 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { plural, renderBand } from './band'
+import { plural, renderBand, statusDot } from './band'
 import { parseFiles } from './commit'
 import { isBot, parseSearch, toReview } from './prs'
 import { ROW_H, asciiRows, laneWindow, layout, parseLog, renderLanes } from './graph'
 import { isBotBranch, parseRefs, scanMerged } from './merged'
-import { cachedLanes, dirtyWorktreesLabel, filesSummary, logArgv, parseStatus, statusDot } from './register'
+import { cachedLanes, dirtyWorktreesLabel, explainPrompt, filesSummary, logArgv, parseStatus } from './register'
 import { dirtyWorktrees, parseWorktreeList, parseWorktreeLock } from './worktree'
 
 const S = '\x1f'
@@ -161,6 +161,29 @@ test('clicking a commit lists its files under it; clicking a file shows its diff
     expect(await ui.find({ type: 'Button', key: 'file-b000001-src/a.ts' })).toBeUndefined()
     await ui.unmount()
   }
+})
+
+test('"Wyjaśnij z Claude" drafts a question about the commit into the prompt box, sending nothing', async ($, on) => {
+  const filled: string[] = []
+  on('process.run', async (_$, e) => {
+    const a = e.argv.join(' ')
+    if (a.startsWith('git log')) return ok(LOG)
+    if (a.includes('--name-status')) return ok('M\tsrc/a.ts\n')
+    if (a.includes('--numstat')) return ok('1\t1\tsrc/a.ts\n')
+    return ok(STATUS)
+  })
+  on('prompt.fill', async (_$, e) => {
+    filled.push(e.text)
+    return { isFilled: true }
+  })
+  const ui = await $.ui.mount({ plugin: 'git-tree', surface: 'desktop', component: 'Pane', requestId: 'git-tree', props: PANE_PROPS })
+  await ui.press({ key: 'refresh' })
+  await ui.press({ key: 'c-a000001' })
+  await ui.press({ key: 'explain-a000001' })
+  expect(filled).toEqual([explainPrompt('a000001', 'fix a')])
+  expect(filled[0]).toContain('git show a000001')
+  await ui.press({ key: 'c-a000001' })
+  await ui.unmount()
 })
 
 test('worktree button: confirm, then squash, remove, delete branch — no push', async ($, on) => {
