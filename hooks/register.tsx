@@ -13,6 +13,7 @@ import type {
   RepoStatus,
   WorktreeInfo,
 } from '../types'
+import { findHandoffFile, loadHandoffPrompt, offerLoad } from './handoff'
 import { loadPrs } from './prs'
 import { TREE_ICON, boldSans, renderBand, statusDot } from './band'
 import { loadCommit, loadFileDiff } from './commit'
@@ -42,6 +43,125 @@ const dirtyWts = atom({ plugin: 'git-tree', key: 'dirtyWorktrees' } as const, []
 const prs = atom({ plugin: 'git-tree', key: 'prs' } as const, null as PrSummary | null)
 
 let lastPrs = ''
+
+const handoffCommand = atom({ plugin: 'git-tree', key: 'handoffCommand' } as const, null as string | null)
+let handoffChecked = false
+
+/** Matt Pocock's handoff skill, as the session lists it: its plugin-qualified name first. */
+export function findHandoff(commands: { name: string; plugin?: string }[]): string | null {
+  const exact = commands.find(c => c.name === 'mattpocock-skills:handoff')
+  if (exact) return exact.name
+  const loose = commands.find(c => /(^|:)handoff$/.test(c.name) && /mattpocock/.test(`${c.plugin ?? ''} ${c.name}`))
+  return loose?.name ?? null
+}
+
+/** Looks the skill up once per load; the band shows its button only when it is installed. */
+async function detectHandoff($: EngineInterface) {
+  if (handoffChecked) return
+  handoffChecked = true
+  const commands = await $.command.list().catch(() => [])
+  const name = findHandoff(commands)
+  if ((await read($, handoffCommand)) !== name) await update($, handoffCommand, () => name)
+}
+
+const handoffAt = atom({ plugin: 'git-tree', key: 'handoffAt' } as const, 0)
+const promptsSinceHandoff = atom({ plugin: 'git-tree', key: 'promptsSinceHandoff' } as const, 0)
+
+const sessionStartedAt = atom({ plugin: 'git-tree', key: 'sessionStartedAt' } as const, 0)
+const handoffFile = atom({ plugin: 'git-tree', key: 'handoffFile' } as const, null as { path: string; mtimeMs: number } | null)
+const handoffLoaded = atom({ plugin: 'git-tree', key: 'handoffLoaded' } as const, null as string | null)
+
+/**
+ * This session's start: the engine's own `startedAt`, else a stamp taken at the first check
+ * (kept in state, so a reload is no new session).
+ */
+async function markSessionStart($: EngineInterface) {
+  // absent where the engine has no usage report (older builds, the test kit)
+  const started = await Promise.resolve()
+    .then(() => $.session.usage())
+    .then(u => u.startedAt)
+    .catch(() => undefined)
+  const known = await read($, sessionStartedAt)
+  if (typeof started === 'number' && started > 0) {
+    if (known !== started) await update($, sessionStartedAt, () => started)
+  } else if (known === 0) {
+    await update($, sessionStartedAt, () => Date.now())
+  }
+}
+
+/**
+ * Looks in the OS temp directory for the newest handoff document about this repo (by its
+ * path or folder name); read-only. The band offers to load it when an earlier session wrote it.
+ */
+async function refreshHandoffFile($: EngineInterface) {
+  await markSessionStart($)
+  const rp = await $.process.run(['git', 'rev-parse', '--path-format=absolute', '--show-toplevel', '--git-common-dir'])
+  if (rp.exitCode !== 0) return
+  const [top = '', common = ''] = rp.stdout.trim().split('\n')
+  const main = common.replace(/\/\.git\/?$/, '')
+  const tmp = (await Promise.resolve()
+    .then(() => $.env.get('TMPDIR'))
+    .catch(() => undefined)) ?? ''
+  const file = await findHandoffFile({
+    dirs: [tmp, '/tmp'].filter(Boolean),
+    list: dir => $.fs.list(dir),
+    read: path => $.fs.read(path),
+    marks: [top, main, main.split('/').pop() ?? ''].filter(m => m.length > 2),
+    now: Date.now(),
+  }).catch(() => null)
+  const before = await read($, handoffFile)
+  if (JSON.stringify(before) !== JSON.stringify(file)) await update($, handoffFile, () => file)
+}
+
+/** One click picks the work up: the new session reads the earlier session's handoff document. */
+async function loadHandoff($: EngineInterface, path: string) {
+  await update($, handoffLoaded, () => path)
+  $.ui.toast('Wczytuję dokument przekazania z poprzedniej sesji…')
+  const sent = await $.prompt
+    .submit({ text: loadHandoffPrompt(path), asUser: true })
+    .then(() => true)
+    .catch(() => false)
+  if (!sent) {
+    await update($, handoffLoaded, () => null)
+    $.ui.toast('Nie udało się wczytać dokumentu przekazania')
+  }
+}
+
+/** A handoff again is pointless until the person has said something new since the last one. */
+export function handoffBlocked(at: number, promptsSince: number): boolean {
+  return at > 0 && promptsSince === 0
+}
+
+/** What the handoff is for: the next session picks the work up where this one stopped. */
+export const HANDOFF_PURPOSE = 'kontynuowanie pracy w nowej sesji'
+
+/**
+ * One click runs the handoff skill straight away, as if the person had typed
+ * `/mattpocock-skills:handoff kontynuowanie pracy w nowej sesji`. Should the engine refuse a
+ * plugin's command run, the same line goes in as the person's own prompt instead.
+ */
+async function startHandoff($: EngineInterface, command: string) {
+  const at = await read($, handoffAt)
+  if (handoffBlocked(at, await read($, promptsSinceHandoff))) {
+    const age = ago(at, Date.now())
+    $.ui.toast(`Handoff już zrobiony ${age === 'teraz' ? 'przed chwilą' : `${age} temu`} — od tamtej pory nic nowego w rozmowie`)
+    return
+  }
+  await update($, handoffAt, () => Date.now())
+  await update($, promptsSinceHandoff, () => 0)
+  $.ui.toast('Handoff: streszczam rozmowę dla nowej sesji…')
+  // a refusal comes back as `{ deny }`, not as a rejection
+  const ran = await $.command
+    .run({ command, args: HANDOFF_PURPOSE })
+    .then(r => !(r && typeof r === 'object' && 'deny' in r))
+    .catch(() => false)
+  if (ran) return
+  const sent = await $.prompt
+    .submit({ text: `/${command} ${HANDOFF_PURPOSE}`, asUser: true })
+    .then(() => true)
+    .catch(() => false)
+  if (!sent) $.ui.toast('Nie udało się uruchomić handoff')
+}
 
 /** Pull requests needing you, from GitHub via `gh`; a failed ask keeps what was known. */
 async function refreshPrs($: EngineInterface) {
@@ -296,6 +416,9 @@ export const register: Register = on => {
     void fetchRemote($).catch(() => {})
     $.clock.every(FETCH_MS, () => void fetchRemote($).catch(() => {}))
     void refreshPrs($)
+    void detectHandoff($)
+    void refreshHandoffFile($).catch(() => {})
+    $.clock.every(FETCH_MS, () => void refreshHandoffFile($).catch(() => {}))
     $.clock.every(FETCH_MS, () => void refreshPrs($))
 
     return next(e)
@@ -306,6 +429,11 @@ export const register: Register = on => {
     void refresh($, true)
 
     return { text: 'Panel z drzewkiem git otwarty.' }
+  })
+
+  on('prompt.submit', async ($, e, next) => {
+    if (e.origin.kind !== 'plugin') await update($, promptsSinceHandoff, n => n + 1).catch(() => {})
+    return next(e)
   })
 
   on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
@@ -326,6 +454,10 @@ export const register: Register = on => {
     const wt = await read($, worktree)
     const others = await read($, dirtyWts)
     const pr = await read($, prs)
+    const handoff = await read($, handoffCommand)
+    const handoffDone = handoffBlocked(await read($, handoffAt), await read($, promptsSinceHandoff))
+    const pickup = await read($, handoffFile)
+    const loadable = offerLoad(pickup, await read($, sessionStartedAt), await read($, handoffLoaded)) ? pickup : null
 
     const elements = $.ui.resolve(e)
     const { Box, Text, Button } = elements
@@ -376,6 +508,21 @@ export const register: Register = on => {
               {prLinks}
             </Box>
             <Box flexDirection="row" alignItems="center" gap={1} key="band-tree-box">
+              {loadable ? (
+                <Button
+                  key="band-load-handoff"
+                  variant="primary"
+                  label="📂 Załaduj handoff"
+                  onPress={() => loadHandoff($, loadable.path)}
+                />
+              ) : handoff && (
+                <Button
+                  key="band-handoff"
+                  variant="secondary"
+                  label={handoffDone ? '🤝 Handoff ✓' : '🤝 Handoff'}
+                  onPress={() => startHandoff($, handoff)}
+                />
+              )}
               <Svg key="band-tree-icon" source={TREE_ICON} alt="drzewko commitów" width={18} height={18} />
               <Button key="band-tree" plain label="›" onPress={openTree} />
             </Box>
@@ -421,6 +568,11 @@ export const register: Register = on => {
             </Text>
           )}
           {prLinks}
+          {loadable ? (
+            <Button key="band-load-handoff" plain label="📂 załaduj handoff" onPress={() => loadHandoff($, loadable.path)} />
+          ) : handoff && (
+            <Button key="band-handoff" plain label={handoffDone ? '🤝 handoff ✓' : '🤝 handoff'} onPress={() => startHandoff($, handoff)} />
+          )}
           <Button key="band-tree" plain label="🌳 drzewko" onPress={() => $.ui.open({ id: PANE, title: TITLE })} />
         </Box>
         {below}
@@ -556,7 +708,7 @@ export const register: Register = on => {
             key="refresh"
             variant="secondary"
             label="↻ Odśwież"
-            onPress={() => Promise.all([refresh($, true), refreshPrs($)])}
+            onPress={() => Promise.all([refresh($, true), refreshPrs($), detectHandoff($), refreshHandoffFile($)])}
           />
           <Button
             key="merged"

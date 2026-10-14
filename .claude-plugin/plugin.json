@@ -1,6 +1,6 @@
 {
   "name": "git-tree",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "A git tree for Claude Code: commit graph with files and diffs, a band with branch, push/pull, worktree changes and PRs",
   "homepage": "https://github.com/bpor92/claude-git-tree",
   "types": "./types/index.d.ts",

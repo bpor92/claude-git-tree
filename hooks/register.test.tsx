@@ -2,10 +2,11 @@ import { describe, expect, test } from 'claude-code/testing'
 
 import { boldSans, plural, renderBand, statusDot } from './band'
 import { parseFiles } from './commit'
+import { HANDOFF_MAX_AGE_MS, findHandoffFile, handoffCandidates, loadHandoffPrompt, offerLoad } from './handoff'
 import { isBot, parseSearch, toReview } from './prs'
 import { ROW_H, asciiRows, laneWindow, layout, parseLog, renderLanes } from './graph'
 import { isBotBranch, parseRefs, scanMerged } from './merged'
-import { cachedLanes, dirtyWorktreesLabel, explainPrompt, filesSummary, logArgv, parseStatus } from './register'
+import { cachedLanes, dirtyWorktreesLabel, explainPrompt, filesSummary, findHandoff, HANDOFF_PURPOSE, handoffBlocked, logArgv, parseStatus } from './register'
 import { dirtyWorktrees, parseWorktreeList, parseWorktreeLock } from './worktree'
 
 const S = '\x1f'
@@ -316,6 +317,126 @@ test('the band keeps what plugins beneath it draw there (next-steps suggestions)
     expect(await band.find({ type: 'Button', key: 'band-tree' })).toBeDefined()
     await band.unmount()
   }
+})
+
+describe('handoff (mattpocock-skills)', () => {
+  test('finds the skill by its plugin-qualified name; none when not installed', async () => {
+    expect(findHandoff([{ name: 'clear' }, { name: 'mattpocock-skills:handoff', plugin: 'mattpocock-skills' }])).toBe('mattpocock-skills:handoff')
+    expect(findHandoff([{ name: 'handoff', plugin: 'mattpocock-skills' }])).toBe('handoff')
+    expect(findHandoff([{ name: 'handoff-compact:handoff', plugin: 'handoff-compact' }])).toBeNull()
+    expect(findHandoff([{ name: 'clear' }])).toBeNull()
+  })
+
+  test('one click runs the handoff at once; a second click with nothing new said is blocked', async ($, on) => {
+    const runs: string[] = []
+    on('process.run', async (_$, e) => ok(e.argv[1] === 'log' ? LOG : STATUS))
+    on('command.list', async () => ({
+      value: [{ name: 'mattpocock-skills:handoff', description: 'Compact the conversation', source: 'plugin', plugin: 'mattpocock-skills' }] as never,
+    }))
+    on('command.run', async (_$, e) => {
+      runs.push(`/${e.command} ${e.args}`)
+      return {}
+    })
+    const pane = await $.ui.mount({ plugin: 'git-tree', surface: 'desktop', component: 'Pane', requestId: 'git-tree', props: PANE_PROPS })
+    await pane.press({ key: 'refresh' })
+    await pane.unmount()
+    for (const surface of ['terminal', 'desktop'] as const) {
+      const band = await $.ui.mount({
+        plugin: 'git-tree',
+        surface,
+        component: 'AbovePrompt',
+        props: { hasSurvey: false, isWorking: false, maxRows: 3, bodyColumns: 120 } as never,
+      })
+      await band.press({ key: 'band-handoff' })
+      // after the first run the button carries a check mark
+      expect(JSON.stringify(await band.drawn())).toContain('✓')
+      await band.unmount()
+    }
+    expect(runs).toEqual([`/mattpocock-skills:handoff ${HANDOFF_PURPOSE}`])
+    expect(HANDOFF_PURPOSE).toBe('kontynuowanie pracy w nowej sesji')
+  })
+
+  test('blocked only after a handoff and until the person says something new', async () => {
+    expect(handoffBlocked(0, 0)).toBe(false) // never ran
+    expect(handoffBlocked(1_000, 0)).toBe(true) // ran, nothing new since
+    expect(handoffBlocked(1_000, 1)).toBe(false) // a new message since
+  })
+})
+
+describe('loading a handoff from an earlier session', () => {
+  const NOW = 1_800_000_000_000
+  const file = (name: string, ageMs: number) => ({ name, kind: 'file' as const, mtimeMs: NOW - ageMs })
+
+  test('candidates: Markdown files named handoff, a week old at most, newest first', async () => {
+    const got = handoffCandidates(
+      [file('notes.md', 1), file('handoff-a.md', 5_000), file('HANDOFF-b.md', 1_000), file('handoff.txt', 1), file('handoff-old.md', HANDOFF_MAX_AGE_MS + 1)],
+      NOW,
+    )
+    expect(got.map(e => e.name)).toEqual(['HANDOFF-b.md', 'handoff-a.md'])
+  })
+
+  test('picks the newest document that mentions this repo, across directories', async () => {
+    const texts: Record<string, string> = {
+      '/tmp/a/handoff-other.md': 'about /work/other-project',
+      '/tmp/a/handoff-mine.md': 'see /work/shop for the code',
+      '/tmp/handoff-older-mine.md': 'shop again',
+    }
+    const found = await findHandoffFile({
+      dirs: ['/tmp/a/', '/tmp'],
+      list: async dir =>
+        dir === '/tmp/a/'
+          ? [file('handoff-other.md', 10), file('handoff-mine.md', 20)]
+          : [file('handoff-older-mine.md', 30)],
+      read: async path => texts[path] ?? '',
+      marks: ['/work/shop', 'shop'],
+      now: NOW,
+    })
+    expect(found).toEqual({ path: '/tmp/a/handoff-mine.md', mtimeMs: NOW - 20 })
+  })
+
+  test('offered only for an earlier session\'s document not loaded yet', async () => {
+    const doc = { path: '/tmp/handoff.md', mtimeMs: 1_000 }
+    expect(offerLoad(doc, 2_000, null)).toBe(true) // written before this session started
+    expect(offerLoad(doc, 500, null)).toBe(false) // this session wrote it
+    expect(offerLoad(doc, 2_000, '/tmp/handoff.md')).toBe(false) // already loaded here
+    expect(offerLoad(null, 2_000, null)).toBe(false)
+    expect(loadHandoffPrompt('/tmp/handoff.md')).toContain('Przeczytaj dokument przekazania /tmp/handoff.md')
+  })
+
+  test('the band offers "Załaduj handoff" in place of Handoff and one click sends the pickup', async ($, on) => {
+    const submitted: string[] = []
+    on('process.run', async (_$, e) => {
+      const a = e.argv.join(' ')
+      if (a.startsWith('git log')) return ok(LOG)
+      if (a.includes('--git-common-dir')) return ok('/work/shop\n/work/shop/.git\n')
+      return ok(STATUS)
+    })
+    on('command.list', async () => ({ value: [{ name: 'mattpocock-skills:handoff', description: '', source: 'plugin', plugin: 'mattpocock-skills' }] as never }))
+    on('fs.list', async () => ({ value: [{ name: 'handoff-shop.md', kind: 'file', size: 10, mtimeMs: Date.now() - 60_000, isLink: false }] as never }))
+    on('fs.read', async () => ({ value: 'continue work in /work/shop' as never }))
+    on('prompt.submit', async (_$, e) => {
+      submitted.push(e.text)
+      // answer as core does: the prompt that entered, from where
+      return { text: e.text, origin: e.origin } as never
+    })
+    // the session began after the document was written (stamped at the first check)
+    const pane = await $.ui.mount({ plugin: 'git-tree', surface: 'desktop', component: 'Pane', requestId: 'git-tree', props: PANE_PROPS })
+    await pane.press({ key: 'refresh' })
+    await pane.unmount()
+    const band = await $.ui.mount({
+      plugin: 'git-tree',
+      surface: 'desktop',
+      component: 'AbovePrompt',
+      props: { hasSurvey: false, isWorking: false, maxRows: 3, bodyColumns: 120 } as never,
+    })
+    expect(await band.find({ type: 'Button', key: 'band-handoff' })).toBeUndefined()
+    await band.press({ key: 'band-load-handoff' })
+    expect(submitted).toEqual([loadHandoffPrompt('/tmp/handoff-shop.md')])
+    // loaded: the button goes back to Handoff
+    expect(await band.find({ type: 'Button', key: 'band-load-handoff' })).toBeUndefined()
+    expect(await band.find({ type: 'Button', key: 'band-handoff' })).toBeDefined()
+    await band.unmount()
+  })
 })
 
 test('band above the prompt shows push and pull counts on every surface', async ($, on) => {

@@ -25,6 +25,11 @@ interface: a commit graph in a pane beside the conversation and a status band ab
 - the repo's other worktrees that hold uncommitted changes
 - pull requests: how many wait for your review and how many came back with changes requested,
   with links to the newest of each
+- **🤝 Handoff** — shown when Matt Pocock's `handoff` skill is installed: one click runs it so the
+  next session can pick the work up. It shows ✓ afterwards and won't repeat until you say something new
+- **📂 Załaduj handoff** (“load handoff”) — in a new session, when an earlier session left a handoff
+  document about this repo (a `*handoff*.md` under a week old in the temp directory), it takes the
+  Handoff button's place; one click asks Claude to read it and continue
 - a tree glyph and `›` that open the pane
 
 **The “Drzewko git” pane** (opens by itself, or with `/git-tree`)
@@ -65,7 +70,8 @@ Installed from a terminal, it also loads in local sessions of the desktop app.
 
 Only local `git` commands (reading state; it writes only when you press the close-worktree button),
 `git fetch --quiet --no-tags` every 5 minutes, and read-only `gh search prs` / `gh api user` queries.
-Nothing is ever pushed.
+To offer a handoff it lists `$TMPDIR` and `/tmp` and reads the newest `*handoff*.md` files there,
+only to check they mention this repo. Nothing is ever pushed.
 
 ## Development
 
@@ -76,7 +82,8 @@ claude plugin test .
 
 Code: `hooks/register.tsx` (hooks, pane, band), `hooks/graph.ts` (graph layout and lanes),
 `hooks/band.ts` (the band as SVG, icons, status dots), `hooks/commit.ts` (a commit's files and diff),
-`hooks/merged.ts` (merged-branch detection), `hooks/worktree.ts`, `hooks/prs.ts`.
+`hooks/merged.ts` (merged-branch detection), `hooks/worktree.ts`, `hooks/prs.ts`,
+`hooks/handoff.ts` (finding an earlier session's handoff document).
 
 ## License
 

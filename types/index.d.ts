@@ -77,6 +77,18 @@ declare module 'claude-code' {
       dirtyWorktrees: OtherWorktree[]
       /** Pull requests needing you, from GitHub; null until known or when `gh` cannot answer. */
       prs: PrSummary | null
+      /** The installed handoff skill's command (`mattpocock-skills:handoff`), or null when absent. */
+      handoffCommand: string | null
+      /** When the last handoff ran (ms); 0 before any. */
+      handoffAt: number
+      /** Messages the person sent since that handoff: none means nothing new to hand off. */
+      promptsSinceHandoff: number
+      /** When this session started (ms), set once; a handoff written before it came from an earlier session. */
+      sessionStartedAt: number
+      /** The newest handoff document about this repo found in the temp directory, or null. */
+      handoffFile: { path: string; mtimeMs: number } | null
+      /** The handoff document this session already loaded, so its button goes back to Handoff. */
+      handoffLoaded: string | null
       close: CloseState
       hideMerged: boolean
       /** How many merged branches the last scan hid; null before the first scan or when shown. */
